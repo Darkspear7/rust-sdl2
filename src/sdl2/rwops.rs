@@ -1,52 +1,13 @@
+use std::ffi::CString;
 use std::io;
 use std::io::IoResult;
 use libc::{c_void, c_int, size_t};
 use get_error;
 use SdlResult;
 
-#[allow(non_camel_case_types)]
-pub mod ll {
-    use libc::{c_uchar, uint32_t, c_char, FILE, c_void};
-    use libc::{c_int, int64_t, size_t};
+pub use sys::rwops as ll;
 
-    #[allow(dead_code)]
-    #[repr(C)]
-    struct SDL_RWops_Anon {
-        data: [c_uchar, ..24],
-    }
-
-    pub type SDL_bool = c_int;
-
-    pub static RW_SEEK_SET: c_int = 0;
-    pub static RW_SEEK_CUR: c_int = 1;
-    pub static RW_SEEK_END: c_int = 2;
-
-    #[allow(dead_code)]
-    #[repr(C)]
-    pub struct SDL_RWops {
-        pub size:  extern "C" fn(context: *const SDL_RWops) -> int64_t,
-        pub seek:  extern "C" fn(context: *const SDL_RWops, offset: int64_t, whence: c_int) -> int64_t,
-        pub read:  extern "C" fn(context: *const SDL_RWops, ptr: *const c_void,
-                                 size: size_t, maxnum: size_t) -> size_t,
-        pub write: extern "C" fn(context: *const SDL_RWops, ptr: *const c_void,
-                                 size: size_t, maxnum: size_t) -> size_t,
-        pub close: extern "C" fn(context: *const SDL_RWops) -> c_int,
-        pub _type: uint32_t,
-        hidden: SDL_RWops_Anon
-    }
-
-    extern "C" {
-        pub fn SDL_RWFromFile(file: *const c_char, mode: *const c_char) -> *const SDL_RWops;
-        pub fn SDL_RWFromFP(fp: *const FILE, autoclose: SDL_bool) -> *const SDL_RWops;
-        pub fn SDL_RWFromMem(mem: *const c_void, size: c_int) -> *const SDL_RWops;
-        pub fn SDL_RWFromConstMem(mem: *const c_void, size: c_int) -> *const SDL_RWops;
-
-        pub fn SDL_AllocRW() -> *const SDL_RWops;
-        pub fn SDL_FreeRW(area: *const SDL_RWops);
-    }
-}
-
-#[deriving(PartialEq)] #[allow(raw_pointer_deriving)]
+#[derive(PartialEq)] #[allow(raw_pointer_derive)]
 pub struct RWops {
     raw: *const ll::SDL_RWops,
     close_on_drop: bool
@@ -59,7 +20,9 @@ impl_owned_accessors!(RWops, close_on_drop);
 impl RWops {
     pub fn from_file(path: &Path, mode: &str) -> SdlResult<RWops> {
         let raw = unsafe {
-            ll::SDL_RWFromFile(path.to_c_str().into_inner(), mode.to_c_str().into_inner())
+            let path_c = CString::from_slice(path.as_vec()).as_ptr();
+            let mode_c = CString::from_slice(mode.as_bytes()).as_ptr();
+            ll::SDL_RWFromFile(path_c, mode_c)
         };
         if raw.is_null() { Err(get_error()) }
         else { Ok(RWops{raw: raw, close_on_drop: true}) }

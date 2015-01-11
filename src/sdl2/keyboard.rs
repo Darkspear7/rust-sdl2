@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::{c_str_to_bytes, CString};
 use std::num::FromPrimitive;
 use std::ptr;
 
@@ -7,47 +8,7 @@ use rect::Rect;
 use scancode::ScanCode;
 use video::Window;
 
-#[allow(non_camel_case_types)]
-pub mod ll {
-    use libc::{c_int, c_char, c_uint, int32_t, uint8_t, uint16_t,
-                    uint32_t};
-    use rect::Rect;
-    use video::ll::SDL_Window;
-
-    pub type SDL_bool = c_int;
-    pub type SDL_Rect = Rect;
-    pub type SDL_Keycode = int32_t;
-    pub type SDL_Keymod = c_uint;
-    pub type SDL_Scancode = c_uint;
-
-    // SDL_keyboard.h
-    #[deriving(Copy, Clone)]
-    pub struct SDL_Keysym {
-        pub scancode: SDL_Scancode,
-        pub sym: SDL_Keycode,
-        pub _mod: uint16_t,
-        pub unused: uint32_t,
-    }
-
-    extern "C" {
-        pub fn SDL_GetKeyboardFocus() -> *const SDL_Window;
-        pub fn SDL_GetKeyboardState(numkeys: *const c_int) -> *const uint8_t;
-        pub fn SDL_GetModState() -> SDL_Keymod;
-        pub fn SDL_SetModState(modstate: SDL_Keymod);
-        pub fn SDL_GetKeyFromScancode(scancode: SDL_Scancode) -> SDL_Keycode;
-        pub fn SDL_GetScancodeFromKey(key: SDL_Keycode) -> SDL_Scancode;
-        pub fn SDL_GetScancodeName(scancode: SDL_Scancode) -> *const c_char;
-        pub fn SDL_GetScancodeFromName(name: *const c_char) -> SDL_Scancode;
-        pub fn SDL_GetKeyName(key: SDL_Keycode) -> *const c_char;
-        pub fn SDL_GetKeyFromName(name: *const c_char) -> SDL_Keycode;
-        pub fn SDL_StartTextInput();
-        pub fn SDL_IsTextInputActive() -> SDL_bool;
-        pub fn SDL_StopTextInput();
-        pub fn SDL_SetTextInputRect(rect: *const SDL_Rect);
-        pub fn SDL_HasScreenKeyboardSupport() -> SDL_bool;
-        pub fn SDL_IsScreenKeyboardShown(window: *const SDL_Window) -> SDL_bool;
-    }
-}
+pub use sys::keyboard as ll;
 
 bitflags! {
     flags Mod: u32 {
@@ -119,32 +80,30 @@ pub fn get_scancode_from_key(key: KeyCode) -> ScanCode {
 pub fn get_scancode_name(scancode: ScanCode) -> String {
     unsafe {
         let scancode_name = ll::SDL_GetScancodeName(scancode as u32);
-        String::from_raw_buf(scancode_name as *const u8)
+        String::from_utf8_lossy(c_str_to_bytes(&scancode_name)).to_string()
     }
 }
 
 pub fn get_scancode_from_name(name: &str) -> ScanCode {
     unsafe {
-        name.with_c_str(|name| {
-            FromPrimitive::from_int(ll::SDL_GetScancodeFromName(name) as int)
-                .unwrap_or(ScanCode::Unknown)
-        })
+        let name = CString::from_slice(name.as_bytes()).as_ptr();
+        FromPrimitive::from_int(ll::SDL_GetScancodeFromName(name) as int)
+            .unwrap_or(ScanCode::Unknown)
     }
 }
 
 pub fn get_key_name(key: KeyCode) -> String {
     unsafe {
         let key_name = ll::SDL_GetKeyName(key as i32);
-        String::from_raw_buf(key_name as *const u8)
+        String::from_utf8_lossy(c_str_to_bytes(&key_name)).to_string()
     }
 }
 
 pub fn get_key_from_name(name: &str) -> KeyCode {
     unsafe {
-        name.with_c_str(|name| {
-            FromPrimitive::from_int(ll::SDL_GetKeyFromName(name) as int)
-                .unwrap_or(KeyCode::Unknown)
-        })
+        let name = CString::from_slice(name.as_bytes()).as_ptr();
+        FromPrimitive::from_int(ll::SDL_GetKeyFromName(name) as int)
+            .unwrap_or(KeyCode::Unknown)
     }
 }
 

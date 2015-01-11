@@ -1,24 +1,13 @@
+use std::ffi::{c_str_to_bytes, CString};
 use SdlResult;
 use get_error;
 
-#[allow(non_camel_case_types)]
-pub mod ll {
-    use libc::{c_int, c_char};
-
-    pub type SDL_bool = c_int;
-
-    extern "C" {
-        pub fn SDL_SetClipboardText(text: *const c_char) -> c_int;
-        pub fn SDL_GetClipboardText() -> *const c_char;
-        pub fn SDL_HasClipboardText() -> SDL_bool;
-    }
-}
+pub use sys::clipboard as ll;
 
 pub fn set_clipboard_text(text: &String) -> SdlResult<()> {
     unsafe {
-        let result = text.with_c_str(|buff| {
-            ll::SDL_SetClipboardText(buff)
-        });
+        let buff = CString::from_slice(text.as_slice().as_bytes());
+        let result = ll::SDL_SetClipboardText(buff.as_ptr());
 
         if result == 0 {
             Err(get_error())
@@ -30,8 +19,8 @@ pub fn set_clipboard_text(text: &String) -> SdlResult<()> {
 
 pub fn get_clipboard_text() -> SdlResult<String> {
     let result = unsafe {
-        let cstr = ll::SDL_GetClipboardText() as *const u8;
-        String::from_raw_buf(cstr)
+        let buf = ll::SDL_GetClipboardText();
+        String::from_utf8_lossy(c_str_to_bytes(&buf)).to_string()
     };
 
     if result.len() == 0 {
